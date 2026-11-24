@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter_new/ffprobe_kit.dart';
 import 'package:ffmpeg_kit_flutter_new/return_code.dart';
 
 class FfmpegResult {
@@ -11,7 +12,23 @@ class FfmpegResult {
   final String log;
 }
 
+/// Datos básicos de un video obtenidos con FFprobe.
+class VideoProbe {
+  const VideoProbe({
+    required this.hasVideo,
+    required this.hasAudio,
+    required this.durationMs,
+  });
+
+  final bool hasVideo;
+  final bool hasAudio;
+  final int durationMs;
+}
+
 /// Envoltorio fino sobre ffmpeg_kit_flutter_new.
+///
+/// Cada método devuelve su Future SOLO cuando la sesión de FFmpeg terminó
+/// realmente (callback de finalización), por lo que `await` es secuencial.
 class FfmpegService {
   const FfmpegService();
 
@@ -27,6 +44,7 @@ class FfmpegService {
   }) {
     final args = <String>[
       '-y',
+      '-nostdin',
       '-hide_banner',
       '-i', inputVideo,
       '-i', overlayPng,
@@ -51,11 +69,31 @@ class FfmpegService {
   }) {
     return _run([
       '-y',
+      '-nostdin',
       '-hide_banner',
       '-i', inputPng,
       '-q:v', '2',
       outputJpg,
     ]);
+  }
+
+  /// Inspecciona un video. Devuelve `null` si FFprobe no pudo leerlo
+  /// (archivo corrupto/incompleto).
+  Future<VideoProbe?> probeVideo(String path) async {
+    try {
+      final session = await FFprobeKit.getMediaInformation(path);
+      final info = session.getMediaInformation();
+      if (info == null) return null;
+      final streams = info.getStreams();
+      final seconds = double.tryParse(info.getDuration() ?? '') ?? 0;
+      return VideoProbe(
+        hasVideo: streams.any((s) => s.getType() == 'video'),
+        hasAudio: streams.any((s) => s.getType() == 'audio'),
+        durationMs: (seconds * 1000).round(),
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> cancelAll() => FFmpegKit.cancel();

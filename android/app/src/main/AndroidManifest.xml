@@ -17,6 +17,13 @@
     <!-- Procesar lotes grandes sin que la pantalla se apague (wakelock_plus) -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- Servicio en primer plano para seguir generando con la app minimizada -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <!-- Notificación de progreso (Android 13+ la pide en tiempo de ejecución) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:label="InvitaPro"
         android:name="${applicationName}"
@@ -44,6 +51,10 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <service
+            android:name=".BatchForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

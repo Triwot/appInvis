@@ -1,6 +1,7 @@
 package com.example.invita_pro
 
 import android.content.ContentValues
+import android.content.Intent
 import android.media.MediaScannerConnection
 import android.os.Build
 import android.os.Environment
@@ -31,7 +32,63 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
             .setMethodCallHandler { call, result -> onCall(call, result) }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "invitapro/foreground")
+            .setMethodCallHandler { call, result -> onForegroundCall(call, result) }
     }
+
+    /**
+     * Control del servicio en primer plano:
+     *  - start(title, text): arranca el servicio + notificación persistente.
+     *  - update(title, text, percent): actualiza la notificación (percent 0..100).
+     *  - finish(title, text): detiene el servicio y avisa con una notificación final.
+     *  - stop(): detiene el servicio sin aviso (cancelación).
+     */
+    private fun onForegroundCall(call: MethodCall, result: MethodChannel.Result) {
+        val title = call.argument<String>("title") ?: "InvitaPro"
+        val text = call.argument<String>("text") ?: ""
+        try {
+            when (call.method) {
+                "start" -> {
+                    BatchForegroundService.ensureChannels(this)
+                    val intent = Intent(this, BatchForegroundService::class.java)
+                        .putExtra(BatchForegroundService.EXTRA_TITLE, title)
+                        .putExtra(BatchForegroundService.EXTRA_TEXT, text)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        startForegroundService(intent)
+                    } else {
+                        startService(intent)
+                    }
+                    result.success(true)
+                }
+                "update" -> {
+                    val percent = call.argument<Int>("percent")
+                    BatchForegroundService.notify(
+                        this,
+                        BatchForegroundService.NOTIFICATION_ID,
+                        BatchForegroundService.progressNotification(this, title, text, percent)
+                    )
+                    result.success(true)
+                }
+                "finish" -> {
+                    stopService(Intent(this, BatchForegroundService::class.java))
+                    BatchForegroundService.notify(
+                        this,
+                        BatchForegroundService.DONE_NOTIFICATION_ID,
+                        BatchForegroundService.doneNotification(this, title, text)
+                    )
+                    result.success(true)
+                }
+                "stop" -> {
+                    stopService(Intent(this, BatchForegroundService::class.java))
+                    result.success(true)
+                }
+                else -> result.notImplemented()
+            }
+        } catch (e: Exception) {
+            result.error("FGS_ERROR", e.message, null)
+        }
+    }
+
 
     private fun onCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {

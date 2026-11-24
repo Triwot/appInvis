@@ -9,13 +9,11 @@ class ProjectState extends ChangeNotifier {
   TemplateMedia? _template;
   TextStyleConfig _style = const TextStyleConfig();
   String _sampleText = 'Gerson Flores';
-  String _eventName = '';
   final List<GuestEntry> _guests = [];
 
   TemplateMedia? get template => _template;
   TextStyleConfig get style => _style;
   String get sampleText => _sampleText;
-  String get eventName => _eventName;
   List<GuestEntry> get guests => List.unmodifiable(_guests);
   int get guestCount => _guests.length;
 
@@ -40,15 +38,21 @@ class ProjectState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setEventName(String name) {
-    _eventName = name;
-    // Sin notify: solo lo lee la pantalla de exportación al iniciar.
-  }
-
   void replaceGuests(Iterable<String> names) {
     _guests
       ..clear()
       ..addAll(names.map(GuestEntry.new));
+    notifyListeners();
+  }
+
+  /// Agrega nombres al final de la lista existente.
+  void appendGuests(Iterable<String> names) {
+    _guests.addAll(names.map(GuestEntry.new));
+    notifyListeners();
+  }
+
+  void clearGuests() {
+    _guests.clear();
     notifyListeners();
   }
 

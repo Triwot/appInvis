@@ -33,6 +33,15 @@ class PermissionService {
     }
   }
 
+  /// Android 13+: permiso para mostrar la notificación de progreso.
+  /// Si se rechaza, la generación sigue funcionando (solo sin notificación visible).
+  Future<void> requestNotifications() async {
+    if (!Platform.isAndroid) return;
+    if (await sdkInt() >= 33) {
+      await Permission.notification.request();
+    }
+  }
+
   /// `false` solo si el guardado es imposible (Android 9 o menor sin permiso).
   Future<bool> ensureWriteAccess() async {
     if (!Platform.isAndroid) return true;

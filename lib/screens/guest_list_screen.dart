@@ -31,19 +31,49 @@ class _GuestListScreenState extends State<GuestListScreen> {
     _raw.text = _raw.text.isEmpty ? data.text! : '${_raw.text}\n${data.text!}';
   }
 
-  void _clean() {
+  void _organize() {
     final project = ProjectScope.of(context);
     final names = WhatsAppParser.clean(_raw.text);
     FocusScope.of(context).unfocus();
-    project.replaceGuests(names);
+    if (names.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se encontraron nombres en el texto pegado')),
+      );
+      return;
+    }
+    // Se agregan a la lista inferior y se vacía el cuadro para no duplicar
+    // los nombres si se vuelve a pulsar el botón.
+    project.appendGuests(names);
+    _raw.clear();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${names.length} invitados detectados')),
+      SnackBar(content: Text('${names.length} invitados agregados a la lista')),
     );
   }
 
-  void _clearAll() {
-    _raw.clear();
-    ProjectScope.of(context).replaceGuests(const []);
+  Future<void> _clearGuestList() async {
+    final project = ProjectScope.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Limpiar lista'),
+        content: Text('Se eliminarán los ${project.guestCount} invitados de la lista.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 40),
+              backgroundColor: Colors.redAccent,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) project.clearGuests();
   }
 
   @override
@@ -52,22 +82,34 @@ class _GuestListScreenState extends State<GuestListScreen> {
     final guests = project.guests;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Lista de invitados'),
-        actions: [
-          IconButton(
-            tooltip: 'Vaciar todo',
-            onPressed: (_raw.text.isEmpty && guests.isEmpty) ? null : _clearAll,
-            icon: const Icon(Icons.delete_sweep_outlined),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Lista de invitados')),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: Column(
               children: [
+                Row(
+                  children: [
+                    const Text(
+                      'Texto pegado de WhatsApp',
+                      style: TextStyle(color: Colors.white60, fontWeight: FontWeight.w600),
+                    ),
+                    const Spacer(),
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _raw,
+                      builder: (_, value, _) => TextButton.icon(
+                        onPressed: value.text.isEmpty ? null : _raw.clear,
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          foregroundColor: Colors.white70,
+                        ),
+                        icon: const Icon(Icons.backspace_outlined, size: 18),
+                        label: const Text('Borrar todo'),
+                      ),
+                    ),
+                  ],
+                ),
                 TextField(
                   controller: _raw,
                   minLines: 5,
@@ -92,9 +134,9 @@ class _GuestListScreenState extends State<GuestListScreen> {
                     Expanded(
                       flex: 2,
                       child: FilledButton.icon(
-                        onPressed: _clean,
+                        onPressed: _organize,
                         icon: const Icon(Icons.auto_fix_high),
-                        label: const Text('Limpiar lista'),
+                        label: const Text('Organizar invitados'),
                       ),
                     ),
                   ],
@@ -122,7 +164,17 @@ class _GuestListScreenState extends State<GuestListScreen> {
                 ),
                 const Spacer(),
                 TextButton.icon(
+                  onPressed: guests.isEmpty ? null : _clearGuestList,
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: Colors.redAccent,
+                  ),
+                  icon: const Icon(Icons.delete_sweep_outlined),
+                  label: const Text('Limpiar lista'),
+                ),
+                TextButton.icon(
                   onPressed: project.addGuest,
+                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
                   icon: const Icon(Icons.add),
                   label: const Text('Añadir'),
                 ),
@@ -133,7 +185,7 @@ class _GuestListScreenState extends State<GuestListScreen> {
             child: guests.isEmpty
                 ? const Center(
                     child: Text(
-                      'Aún no hay invitados.\nPega la lista y pulsa “Limpiar lista”.',
+                      'Aún no hay invitados.\nPega la lista y pulsa “Organizar invitados”.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.white54),
                     ),
